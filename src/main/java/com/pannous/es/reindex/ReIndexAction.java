@@ -3,10 +3,8 @@ package com.pannous.es.reindex;
 import org.json.JSONException;
 import org.json.JSONObject;
 import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+
 import org.elasticsearch.action.admin.indices.flush.FlushRequest;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
@@ -48,11 +46,112 @@ public class ReIndexAction extends BaseRestHandler {
 
     private int hitsPerPage = 0;
 
+    private String[] emailSendSkips = {"profileData", "viaMessageBus"};
+
+    private List<String> emailSendSkipList = Arrays.asList(emailSendSkips);
+
+    private String[] userSkips = {
+            "ab_group",
+            "ab_seg",
+            "AprilBlankEmailGroup",
+            "collectionProductRecos",
+            "coupon",
+            "credit3_amount",
+            "credit_amount",
+            "dataFields",
+            "dbi_late2_order_number",
+            "dbi_late2_sku1_image_url",
+            "dbi_late2_sku1_name",
+            "dbi_late2_sku1_qty",
+            "dbi_late2_sku1_sku",
+            "dbi_late2_sku1_url",
+            "dbi_late2_sku2_image_url",
+            "dbi_late2_sku2_name",
+            "dbi_late2_sku2_qty",
+            "dbi_late2_sku2_sku",
+            "dbi_late2_sku2_url",
+            "dbi_late2_sku3_image_url",
+            "dbi_late2_sku3_name",
+            "dbi_late2_sku3_qty",
+            "dbi_late2_sku3_sku",
+            "dbi_late2_sku3_url",
+            "dbi_late2_sku4_image_url",
+            "dbi_late2_sku4_name",
+            "dbi_late2_sku4_qty",
+            "dbi_late2_sku4_sku",
+            "dbi_late2_sku4_url",
+            "dbi_late3_order_number",
+            "dbi_late3_sku1_image_url",
+            "dbi_late3_sku1_name",
+            "dbi_late3_sku1_qty",
+            "dbi_late3_sku1_sku",
+            "dbi_late3_sku1_url",
+            "dbi_late_new_est_del_date_sku1",
+            "dbi_late_new_est_del_date_sku2",
+            "dbi_late_new_est_del_date_sku3",
+            "dbi_late_new_est_del_date_sku4",
+            "dbi_late_order_delaytime",
+            "dbi_late_order_number",
+            "dbi_late_sku1_image_url",
+            "dbi_late_sku1_name",
+            "dbi_late_sku1_qty",
+            "dbi_late_sku1_sku",
+            "dbi_late_sku1_url",
+            "dbi_late_sku2_image_url",
+            "dbi_late_sku2_name",
+            "dbi_late_sku2_qty",
+            "dbi_late_sku2_sku",
+            "dbi_late_sku2_url",
+            "dbi_late_sku3_image_url",
+            "dbi_late_sku3_name",
+            "dbi_late_sku3_qty",
+            "dbi_late_sku3_sku",
+            "dbi_late_sku3_url",
+            "dbi_late_sku4_image_url",
+            "dbi_late_sku4_name",
+            "dbi_late_sku4_qty",
+            "dbi_late_sku4_sku",
+            "dbi_late_sku4_url",
+            "campaignId",
+            "templateId",
+            "Engagement",
+            "exception",
+            "facebook_code",
+            "fields",
+            "foo",
+            "lastActiveAt",
+            "lastBrowsedProducts",
+            "messageBusId",
+            "Name",
+            "personalizedDrip",
+            "recipientState",
+            "recovery_credit",
+            "recovery_OrderNum",
+            "region",
+            "sailthru_engagement_level",
+            "sailthruLastClick",
+            "sailthruLastOpen",
+            "transactionalData",
+            "twitter_code",
+            "userProductRecos",
+            "value",
+            "welcomeDripDay",
+            "wf408Drip1",
+            "wf408Drip2",
+            "wf408Drip3",
+            "wf408Drip4",
+            "wf408Drip5",
+            "wf78"
+    };
+
+    private List<String> userSkipList = Arrays.asList(userSkips);
+
     private List<String> skipFieldList = new ArrayList<String>();
 
     public void handleRequest(RestRequest request, RestChannel channel, String newTypeOverride, boolean internalCall, Client client, List<String> skipFieldList) {
         this.skipFieldList = skipFieldList;
 
+        logger.info("Skip field list", skipFieldList);
         logger.info("ReIndexAction.handleRequest [{}]", request.params());
         String newIndexName = request.param("index");
         String searchIndexName = request.param("searchIndex");
@@ -133,7 +232,7 @@ public class ReIndexAction extends BaseRestHandler {
             if (currentResults == 0)
                 break;
 
-            MySearchHits res = callback(rsp.hits());
+            MySearchHits res = callback(rsp.hits(), newType);
             if (res == null)
                 break;
             queryWatch.stop();
@@ -195,15 +294,28 @@ public class ReIndexAction extends BaseRestHandler {
     /**
      * Can be used to be overwritten and to rewrite some fields of the hits.
      */
-    protected MySearchHits callback(MySearchHits hits) {
-        if (skipFieldList.size() > 0) {
+    protected MySearchHits callback(MySearchHits hits, String type) {
+        List<String> skips;
+
+        if (type.equals("user")) {
+            skips = userSkipList;
+
+        } else if (type.equals("emailSend")) {
+            skips = emailSendSkipList;
+
+        } else {
+            skips = skipFieldList;
+        }
+
+
+        if (skips.size() > 0) {
             SimpleList res = new SimpleList(hitsPerPage, hits.totalHits());
             for (MySearchHit h : hits.getHits()) {
                 try {
                     String str = new String(h.source(), charset);
                     RewriteSearchHit newHit = new RewriteSearchHit(h.id(), h.parent(), h.version(), str);
 
-                    for (String ignoreField: skipFieldList) {
+                    for (String ignoreField: skips) {
                         newHit.remove(ignoreField);
                     }
                     res.add(newHit);

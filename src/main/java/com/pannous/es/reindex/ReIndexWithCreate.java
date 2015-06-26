@@ -44,7 +44,7 @@ public class ReIndexWithCreate extends BaseRestHandler {
     }
 
     @Override public void handleRequest(RestRequest request, RestChannel channel, Client client) {
-        logger.info("ReIndexWithCreate.handleRequest [{}]", request.toString());
+        logger.info("ReIndexWithCreate.handleRequest new version [{}]", request.toString());
         try {
             // required parameters
             String newIndexName = request.param("index");
@@ -74,10 +74,12 @@ public class ReIndexWithCreate extends BaseRestHandler {
             String skipField = request.param("skipField", "");
             List<String> skipFieldList;
             if (!skipField.isEmpty()) {
-                skipFieldList = Arrays.asList(skipType.trim().split(","));
+                skipFieldList = Arrays.asList(skipField.trim().split(","));
             } else {
                 skipFieldList = new ArrayList<String>();
             }
+
+            logger.info("Skip type: " + skipField);
 
             int newShards = request.paramAsInt("newIndexShards", -1);
             try {

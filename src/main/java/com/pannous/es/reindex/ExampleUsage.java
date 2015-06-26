@@ -60,7 +60,7 @@ public class ExampleUsage {
         Settings emptySettings = ImmutableSettings.settingsBuilder().build();
         RestController contrl = new RestController(emptySettings);
         ReIndexAction action = new ReIndexAction(emptySettings, client, contrl) {
-            @Override protected MySearchHits callback(MySearchHits hits) {
+            @Override protected MySearchHits callback(MySearchHits hits, String type) {
                 SimpleList res = new SimpleList(hitsPerPage, hits.totalHits());
                 for (MySearchHit h : hits.getHits()) {
                     try {
