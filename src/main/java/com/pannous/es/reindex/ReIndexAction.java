@@ -41,7 +41,7 @@ public class ReIndexAction extends BaseRestHandler {
     }
 
     @Override public void handleRequest(RestRequest request, RestChannel channel, Client client) {
-        handleRequest(request, channel, null, false, client, null);
+        handleRequest(request, channel, null, false, client, null, false);
     }
 
     private int hitsPerPage = 0;
@@ -148,8 +148,11 @@ public class ReIndexAction extends BaseRestHandler {
 
     private List<String> skipFieldList = new ArrayList<String>();
 
-    public void handleRequest(RestRequest request, RestChannel channel, String newTypeOverride, boolean internalCall, Client client, List<String> skipFieldList) {
+    boolean skipHardCodedFields = false;
+
+    public void handleRequest(RestRequest request, RestChannel channel, String newTypeOverride, boolean internalCall, Client client, List<String> skipFieldList, Boolean skipHardCodedFields) {
         this.skipFieldList = skipFieldList;
+        this.skipHardCodedFields = skipHardCodedFields;
 
         logger.info("Skip field list", skipFieldList);
         logger.info("ReIndexAction.handleRequest [{}]", request.params());
@@ -297,10 +300,10 @@ public class ReIndexAction extends BaseRestHandler {
     protected MySearchHits callback(MySearchHits hits, String type) {
         List<String> skips;
 
-        if (type.equals("user")) {
+        if (skipHardCodedFields && type.equals("user")) {
             skips = userSkipList;
 
-        } else if (type.equals("emailSend")) {
+        } else if (skipHardCodedFields && type.equals("emailSend")) {
             skips = emailSendSkipList;
 
         } else {

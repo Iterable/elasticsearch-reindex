@@ -96,6 +96,9 @@ public class ReIndexWithCreate extends BaseRestHandler {
                 return;
             }
 
+
+            boolean skipHardCodedFields = request.paramAsBoolean("skipHardCodedFields", false);
+
             // TODO: what if queries goes to the old index while we reindexed?
             // now reindex
 
@@ -110,10 +113,10 @@ public class ReIndexWithCreate extends BaseRestHandler {
                         logger.info("Skip type [{}]", mapKeyCursor.value);
                         continue;
                     }
-                    reindexAction.handleRequest(request, channel, mapKeyCursor.value, true, client, skipFieldList);
+                    reindexAction.handleRequest(request, channel, mapKeyCursor.value, true, client, skipFieldList, skipHardCodedFields);
                 }
             } else {
-                reindexAction.handleRequest(request, channel, type, true, client, skipFieldList);
+                reindexAction.handleRequest(request, channel, type, true, client, skipFieldList, skipHardCodedFields);
             }
 
             boolean delete = request.paramAsBoolean("delete", false);
