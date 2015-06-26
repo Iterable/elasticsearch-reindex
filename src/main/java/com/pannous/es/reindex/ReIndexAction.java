@@ -187,6 +187,7 @@ public class ReIndexAction extends BaseRestHandler {
      * Can be used to be overwritten and to rewrite some fields of the hits.
      */
     protected MySearchHits callback(MySearchHits hits) {
+
         return hits;
     }
 }
