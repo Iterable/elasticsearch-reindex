@@ -1,5 +1,8 @@
 package com.pannous.es.reindex;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -40,10 +43,16 @@ public class ReIndexAction extends BaseRestHandler {
     }
 
     @Override public void handleRequest(RestRequest request, RestChannel channel, Client client) {
-        handleRequest(request, channel, null, false, client);
+        handleRequest(request, channel, null, false, client, null);
     }
 
-    public void handleRequest(RestRequest request, RestChannel channel, String newTypeOverride, boolean internalCall, Client client) {
+    private int hitsPerPage = 0;
+
+    private List<String> skipFieldList = new ArrayList<String>();
+
+    public void handleRequest(RestRequest request, RestChannel channel, String newTypeOverride, boolean internalCall, Client client, List<String> skipFieldList) {
+        this.skipFieldList = skipFieldList;
+
         logger.info("ReIndexAction.handleRequest [{}]", request.params());
         String newIndexName = request.param("index");
         String searchIndexName = request.param("searchIndex");
@@ -60,7 +69,7 @@ public class ReIndexAction extends BaseRestHandler {
         boolean localAction = "localhost".equals(searchHost) && searchPort == 9200;
         boolean withVersion = request.paramAsBoolean("withVersion", false);
         int keepTimeInMinutes = request.paramAsInt("keepTimeInMinutes", 30);
-        int hitsPerPage = request.paramAsInt("hitsPerPage", 1000);
+        hitsPerPage = request.paramAsInt("hitsPerPage", 1000);
         float waitInSeconds = request.paramAsFloat("waitInSeconds", 0);
         String basicAuthCredentials = request.param("credentials", "");
         String filter = request.content().toUtf8();
@@ -187,7 +196,114 @@ public class ReIndexAction extends BaseRestHandler {
      * Can be used to be overwritten and to rewrite some fields of the hits.
      */
     protected MySearchHits callback(MySearchHits hits) {
+        if (skipFieldList.size() > 0) {
+            SimpleList res = new SimpleList(hitsPerPage, hits.totalHits());
+            for (MySearchHit h : hits.getHits()) {
+                try {
+                    String str = new String(h.source(), charset);
+                    RewriteSearchHit newHit = new RewriteSearchHit(h.id(), h.parent(), h.version(), str);
 
-        return hits;
+                    for (String ignoreField: skipFieldList) {
+                        newHit.remove(ignoreField);
+                    }
+                    res.add(newHit);
+                } catch (UnsupportedEncodingException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+
+            return res;
+        } else {
+            return hits;
+        }
+    }
+
+    public static class SimpleList implements MySearchHits {
+
+        long totalHits;
+        List<MySearchHit> hits;
+
+        public SimpleList(int size, long total) {
+            hits = new ArrayList<MySearchHit>(size);
+            totalHits = total;
+        }
+
+        public void add(MySearchHit hit) {
+            hits.add(hit);
+        }
+
+        @Override public Iterable<MySearchHit> getHits() {
+            return hits;
+        }
+
+        @Override
+        public long totalHits() {
+            return totalHits;
+        }
+    }
+
+    private final static String charset = "UTF-8";
+
+    public static class RewriteSearchHit implements MySearchHit {
+
+        String id;
+        String parent;
+        long version;
+        JSONObject json;
+
+        public RewriteSearchHit(String id, String parent, long version, String jsonStr) {
+            this.id = id;
+            this.version = version;
+            this.parent = parent;
+            try {
+                json = new JSONObject(jsonStr);
+            } catch (JSONException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+
+        public String get(String key) {
+            try {
+                if (!json.has(key))
+                    return "";
+                String val = json.getString(key);
+                if (val == null)
+                    return "";
+                return val;
+            } catch (JSONException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+
+        public void remove(String key) {
+            json.remove(key);
+        }
+
+        public JSONObject put(String key, Object obj) {
+            try {
+                return json.put(key, obj);
+            } catch (JSONException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+
+        @Override public String id() {
+            return id;
+        }
+
+        @Override public String parent() {
+            return parent;
+        }
+        @Override public long version() {
+            return version;
+        }
+
+        @Override public byte[] source() {
+            try {
+                return json.toString().getBytes(charset);
+            } catch (UnsupportedEncodingException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
     }
 }

@@ -146,6 +146,10 @@ public class ExampleUsage {
             }
         }
 
+        public void remove(String key) {
+            json.remove(key);
+        }
+
         public JSONObject put(String key, Object obj) {
             try {
                 return json.put(key, obj);
